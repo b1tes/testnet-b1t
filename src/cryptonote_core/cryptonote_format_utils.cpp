@@ -302,14 +302,26 @@ namespace cryptonote
     memcpy(&tx_extra[start_pos], extra_nonce.data(), extra_nonce.size());
     return true;
   }
+
   //---------------------------------------------------------------
   void set_payment_id_to_tx_extra_nonce(blobdata& extra_nonce, const crypto::hash& payment_id)
   {
     extra_nonce.clear();
     extra_nonce.push_back(TX_EXTRA_NONCE_PAYMENT_ID);
+
+    std::cout << "cryptonote_format_utils::extra_nonce.size() 1: " << extra_nonce.size() << "\n\n";
+    std::cout << "cryptonote_format_utils::extra_nonce 1: " << extra_nonce << "\n\n";
+
     const uint8_t* payment_id_ptr = reinterpret_cast<const uint8_t*>(&payment_id);
+
+    std::cout << "cryptonote_format_utils::payment_id_ptr: " << payment_id_ptr << "\n\n";
+
     std::copy(payment_id_ptr, payment_id_ptr + sizeof(payment_id), std::back_inserter(extra_nonce));
+
+    std::cout << "cryptonote_format_utils::extra_nonce.size() 2: " << extra_nonce.size() << "\n\n";
+    std::cout << "cryptonote_format_utils::extra_nonce 2: " << extra_nonce << "\n\n";
   }
+
   //---------------------------------------------------------------
   bool get_payment_id_from_tx_extra_nonce(const blobdata& extra_nonce, crypto::hash& payment_id)
   {

@@ -193,6 +193,10 @@ void wallet2::process_new_transaction(const cryptonote::transaction& tx, uint64_
         payment.m_amount       = received;
         payment.m_block_height = height;
         payment.m_unlock_time  = tx.unlock_time;
+        payment.m_sent_time = time(NULL);
+
+        std::cout << "wallet2 - payment.m_sent_time = time(NULL): " << payment.m_sent_time;
+
         m_payments.emplace(payment_id, payment);
         LOG_PRINT_L2("Payment found: " << payment_id << " / " << payment.m_tx_hash << " / " << payment.m_amount);
       }
@@ -513,16 +517,60 @@ void wallet2::wallet_exists(const std::string& file_path, bool& keys_file_exists
 //----------------------------------------------------------------------------------------------------
 bool wallet2::parse_payment_id(const std::string& payment_id_str, crypto::hash& payment_id)
 {
-  cryptonote::blobdata payment_id_data;
-  if(!epee::string_tools::parse_hexstr_to_binbuff(payment_id_str, payment_id_data))
-    return false;
+	cryptonote::blobdata payment_id_data;
+	if(!epee::string_tools::parse_hexstr_to_binbuff(payment_id_str, payment_id_data))
+		return false;
+
+  std::cout << "wallet2::payment_id_data.size(): " << payment_id_data.size() << "\n\n";
+  std::cout << "wallet2::payment_id_data: " << payment_id_data << "\n\n";
+  std::cout << "wallet2::payment_id_data.data(): " << payment_id_data.data() << "\n\n";
 
   if(sizeof(crypto::hash) != payment_id_data.size())
     return false;
 
   payment_id = *reinterpret_cast<const crypto::hash*>(payment_id_data.data());
+
+  std::cout << "wallet2::payment_id: " << payment_id << "\n\n";
+
   return true;
 }
+
+//----------------------------------------------------------------------------------------------------
+// notarization code
+bool wallet2::parse_notarization_id(const std::string& payment_id_str, crypto::hash& payment_id)
+{
+	cryptonote::blobdata payment_id_data;
+
+
+	//  if(!epee::string_tools::parse_hexstr_to_binbuff(payment_id_str, payment_id_data))
+	//    return false;
+
+	// this code block adds payment_id_str as char type to payment_id_data without parsing from method parse_hexstr_to_binbuff above
+	const char *s = payment_id_str.c_str();
+
+	std::cout << "wallet2::payment_id_str.length(): " << payment_id_str.length() << "\n\n";
+
+	int i;
+	for(i = 0; i < payment_id_str.length(); i++){
+		std::cout << "wallet2::payment_id_str[" << i << "]: " << s[i] << "\n";
+	  payment_id_data.push_back(s[i]);
+	}
+
+	std::cout << "wallet2::payment_id_data.size(): " << payment_id_data.size() << "\n\n";
+	std::cout << "wallet2::payment_id_data: " << payment_id_data << "\n\n";
+	std::cout << "wallet2::payment_id_data.data(): " << payment_id_data.data() << "\n\n";
+
+	// this if is commented since there is no need to check is string is equal in 32 characters
+	//  if(sizeof(crypto::hash) != payment_id_data.size())
+	//    return false;
+
+	payment_id = *reinterpret_cast<const crypto::hash*>(payment_id_data.data());
+
+	std::cout << "wallet2::payment_id: " << payment_id << "\n\n";
+
+	return true;
+}
+
 //----------------------------------------------------------------------------------------------------
 bool wallet2::prepare_file_names(const std::string& file_path)
 {
@@ -726,6 +774,7 @@ void wallet2::add_unconfirmed_tx(const cryptonote::transaction& tx, uint64_t cha
   unconfirmed_transfer_details& utd = m_unconfirmed_txs[cryptonote::get_transaction_hash(tx)];
   utd.m_change = change_amount;
   utd.m_sent_time = time(NULL);
+  std::cout << "transfer - wallet2 - utd.m_sent_time: " << utd.m_sent_time ;
   utd.m_tx = tx;
 }
 //----------------------------------------------------------------------------------------------------

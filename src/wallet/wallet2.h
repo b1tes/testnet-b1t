@@ -100,6 +100,7 @@ namespace tools
       uint64_t m_amount;
       uint64_t m_block_height;
       uint64_t m_unlock_time;
+      time_t m_sent_time; // added for notarization
     };
 
     struct unconfirmed_transfer_details
@@ -193,6 +194,9 @@ namespace tools
 
     static bool parse_payment_id(const std::string& payment_id_str, crypto::hash& payment_id);
 
+    // notarization code
+    static bool parse_notarization_id(const std::string& payment_id_str, crypto::hash& payment_id);
+
   private:
     bool store_keys(const std::string& keys_file_name, const std::string& password);
     void load_keys(const std::string& keys_file_name, const std::string& password);
@@ -261,6 +265,7 @@ namespace boost
       a & x.m_amount;
       a & x.m_block_height;
       a & x.m_unlock_time;
+      a & x.m_sent_time; // added for notarization
     }
   }
 }

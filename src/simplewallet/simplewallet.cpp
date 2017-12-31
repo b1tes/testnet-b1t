@@ -46,6 +46,10 @@
 #include "version.h"
 #include "crypto/crypto.h"  // for crypto::secret_key definition
 #include "crypto/electrum-words.h"
+#include "wallet/wallet2.h"
+
+#include <stdio.h>
+#include <time.h>
 
 #if defined(WIN32)
 #include <crtdbg.h>
@@ -246,6 +250,10 @@ simple_wallet::simple_wallet()
   m_cmd_binder.set_handler("spendkey", boost::bind(&simple_wallet::spendkey, this, _1), "Get spendkey");
   m_cmd_binder.set_handler("seed", boost::bind(&simple_wallet::seed, this, _1), "Get deterministic seed");
   m_cmd_binder.set_handler("help", boost::bind(&simple_wallet::help, this, _1), "Show this help");
+
+  m_cmd_binder.set_handler("notarize", boost::bind(&simple_wallet::notarize, this, _1), "notarize");
+  m_cmd_binder.set_handler("notarizations", boost::bind(&simple_wallet::show_notarizations, this, _1), "payments <payment_id_1> [<payment_id_2> ... <payment_id_N>] - Show payments <payment_id_1>, ... <payment_id_N>");
+
 }
 //----------------------------------------------------------------------------------------------------
 bool simple_wallet::set_log(const std::vector<std::string> &args)
@@ -843,6 +851,65 @@ bool simple_wallet::show_payments(const std::vector<std::string> &args)
 
   return true;
 }
+
+//----------------------------------------------------------------------------------------------------
+bool simple_wallet::show_notarizations(const std::vector<std::string> &args)
+{
+  if(args.empty())
+  {
+    fail_msg_writer() << "expected at least one payment_id";
+    return true;
+  }
+
+  message_writer() << "                            payment                             \t" <<
+    "                          transaction                           \t" <<
+    "  height\t       amount        \tunlock time           \tsent time";
+
+  bool payments_found = false;
+  for(std::string arg : args)
+  {
+    crypto::hash payment_id;
+    if(tools::wallet2::parse_payment_id(arg, payment_id))
+    {
+      std::list<tools::wallet2::payment_details> payments;
+      m_wallet->get_payments(payment_id, payments);
+      if(payments.empty())
+      {
+        success_msg_writer() << "No payments with id " << payment_id;
+        continue;
+      }
+
+      for (const tools::wallet2::payment_details& pd : payments)
+      {
+        if(!payments_found)
+        {
+          payments_found = true;
+        }
+
+//        time_t rawtime;
+//        rawtime = pd.m_sent_time;
+//        struct tm * timeinfo;
+//        timeinfo = localtime ( &rawtime );
+        crypto::hash::get_transaction_hash(pd.m_tx_hash);
+
+        success_msg_writer(true) <<
+          payment_id << '\t' <<
+          pd.m_tx_hash << '\t' <<
+          std::setw(8)  << pd.m_block_height << '\t' <<
+          std::setw(21) << print_money(pd.m_amount) << '\t' <<
+		  std::setw(21) << pd.m_unlock_time << '\t' <<
+		  pd.m_sent_time;
+      }
+    }
+    else
+    {
+      fail_msg_writer() << "payment id has invalid format: \"" << arg << "\", expected 64-character string";
+    }
+  }
+
+  return true;
+}
+
 //----------------------------------------------------------------------------------------------------
 uint64_t simple_wallet::get_daemon_blockchain_height(std::string& err)
 {
@@ -1041,6 +1108,183 @@ bool simple_wallet::transfer(const std::vector<std::string> &args_)
 
   return true;
 }
+
+bool simple_wallet::notarize(const std::vector<std::string> &args_)
+{
+  if (!try_connect_to_daemon())
+    return true;
+
+  std::vector<std::string> local_args = args_;
+  if(local_args.size() < 3)
+  {
+    fail_msg_writer() << "wrong number of arguments, expected at least 3, got " << local_args.size();
+    return true;
+  }
+
+  size_t fake_outs_count;
+  if(!epee::string_tools::get_xtype_from_string(fake_outs_count, local_args[0]))
+  {
+    fail_msg_writer() << "mixin_count should be non-negative integer, got " << local_args[0];
+    return true;
+  }
+  local_args.erase(local_args.begin());
+
+  std::vector<uint8_t> extra;
+  if (1 == local_args.size() % 2)
+  {
+    std::string payment_id_str = local_args.back();
+    local_args.pop_back();
+
+    crypto::hash payment_id;
+
+    // notarization code
+    bool r = tools::wallet2::parse_notarization_id(payment_id_str, payment_id);
+    if(r)
+    {
+      std::string extra_nonce;
+      set_payment_id_to_tx_extra_nonce(extra_nonce, payment_id);
+      r = add_extra_nonce_to_tx_extra(extra, extra_nonce);
+    }
+
+    if(!r)
+    {
+      fail_msg_writer() << "payment id has invalid format: \"" << payment_id_str << "\", expected 64-character string";
+      return true;
+    }
+  }
+
+  vector<cryptonote::tx_destination_entry> dsts;
+  for (size_t i = 0; i < local_args.size(); i += 2)
+  {
+    cryptonote::tx_destination_entry de;
+    if(!get_account_address_from_str(de.addr, local_args[i]))
+    {
+      fail_msg_writer() << "wrong address: " << local_args[i];
+      return true;
+    }
+
+    bool ok = cryptonote::parse_amount(de.amount, local_args[i + 1]);
+    if(!ok || 0 == de.amount)
+    {
+      fail_msg_writer() << "amount is wrong: " << local_args[i] << ' ' << local_args[i + 1] <<
+        ", expected number from 0 to " << print_money(std::numeric_limits<uint64_t>::max());
+      return true;
+    }
+
+    dsts.push_back(de);
+  }
+
+  try
+  {
+    // figure out what tx will be necessary
+    auto ptx_vector = m_wallet->create_transactions(dsts, fake_outs_count, 0 /* unlock_time */, DEFAULT_FEE*m_feemult, extra);
+
+    // if more than one tx necessary, prompt user to confirm
+    if (ptx_vector.size() > 1)
+    {
+        std::string prompt_str = "Your transaction needs to be split into ";
+        prompt_str += std::to_string(ptx_vector.size());
+        prompt_str += " transactions.  This will result in a fee of ";
+        prompt_str += print_money(ptx_vector.size() * DEFAULT_FEE*m_feemult);
+        prompt_str += ".  Is this okay?  (Y/Yes/N/No)";
+        std::string accepted = command_line::input_line(prompt_str);
+        if (accepted != "Y" && accepted != "y" && accepted != "Yes" && accepted != "yes")
+        {
+          fail_msg_writer() << "Transaction cancelled.";
+
+          // would like to return false, because no tx made, but everything else returns true
+          // and I don't know what returning false might adversely affect.  *sigh*
+          return true;
+        }
+    }
+
+    // actually commit the transactions
+    while (!ptx_vector.empty())
+    {
+      auto & ptx = ptx_vector.back();
+      m_wallet->commit_tx(ptx);
+      success_msg_writer(true) << "Money successfully sent, transaction " << get_transaction_hash(ptx.tx);
+
+      // if no exception, remove element from vector
+      ptx_vector.pop_back();
+    }
+  }
+  catch (const tools::error::daemon_busy&)
+  {
+    fail_msg_writer() << "daemon is busy. Please try later";
+  }
+  catch (const tools::error::no_connection_to_daemon&)
+  {
+    fail_msg_writer() << "no connection to daemon. Please, make sure daemon is running.";
+  }
+  catch (const tools::error::wallet_rpc_error& e)
+  {
+    LOG_ERROR("Unknown RPC error: " << e.to_string());
+    fail_msg_writer() << "RPC error \"" << e.what() << '"';
+  }
+  catch (const tools::error::get_random_outs_error&)
+  {
+    fail_msg_writer() << "failed to get random outputs to mix";
+  }
+  catch (const tools::error::not_enough_money& e)
+  {
+    fail_msg_writer() << "not enough money to transfer, available only " << print_money(e.available()) <<
+      ", transaction amount " << print_money(e.tx_amount() + e.fee()) << " = " << print_money(e.tx_amount()) <<
+      " + " << print_money(e.fee()) << " (fee)";
+  }
+  catch (const tools::error::not_enough_outs_to_mix& e)
+  {
+    auto writer = fail_msg_writer();
+    writer << "not enough outputs for specified mixin_count = " << e.mixin_count() << ":";
+    for (const cryptonote::COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::outs_for_amount& outs_for_amount : e.scanty_outs())
+    {
+      writer << "\noutput amount = " << print_money(outs_for_amount.amount) << ", found outputs to mix = " << outs_for_amount.outs.size();
+    }
+  }
+  catch (const tools::error::tx_not_constructed&)
+  {
+    fail_msg_writer() << "transaction was not constructed";
+  }
+  catch (const tools::error::tx_rejected& e)
+  {
+    fail_msg_writer() << "transaction " << get_transaction_hash(e.tx()) << " was rejected by daemon with status \"" << e.status() << '"';
+  }
+  catch (const tools::error::tx_sum_overflow& e)
+  {
+    fail_msg_writer() << e.what();
+  }
+  catch (const tools::error::zero_destination&)
+  {
+    fail_msg_writer() << "one of destinations is zero";
+  }
+  catch (const tools::error::tx_too_big& e)
+  {
+    fail_msg_writer() << "Failed to find a suitable way to split transactions";
+  }
+  catch (const tools::error::transfer_error& e)
+  {
+    LOG_ERROR("unknown transfer error: " << e.to_string());
+    fail_msg_writer() << "unknown transfer error: " << e.what();
+  }
+  catch (const tools::error::wallet_internal_error& e)
+  {
+    LOG_ERROR("internal error: " << e.to_string());
+    fail_msg_writer() << "internal error: " << e.what();
+  }
+  catch (const std::exception& e)
+  {
+    LOG_ERROR("unexpected error: " << e.what());
+    fail_msg_writer() << "unexpected error: " << e.what();
+  }
+  catch (...)
+  {
+    LOG_ERROR("Unknown error");
+    fail_msg_writer() << "unknown error";
+  }
+
+  return true;
+}
+
 //----------------------------------------------------------------------------------------------------
 bool simple_wallet::run()
 {
