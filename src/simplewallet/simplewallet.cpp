@@ -46,10 +46,6 @@
 #include "version.h"
 #include "crypto/crypto.h"  // for crypto::secret_key definition
 #include "crypto/electrum-words.h"
-#include "wallet/wallet2.h"
-
-#include <stdio.h>
-#include <time.h>
 
 #if defined(WIN32)
 #include <crtdbg.h>
@@ -251,8 +247,10 @@ simple_wallet::simple_wallet()
   m_cmd_binder.set_handler("seed", boost::bind(&simple_wallet::seed, this, _1), "Get deterministic seed");
   m_cmd_binder.set_handler("help", boost::bind(&simple_wallet::help, this, _1), "Show this help");
 
-  m_cmd_binder.set_handler("notarize", boost::bind(&simple_wallet::notarize, this, _1), "notarize");
-  m_cmd_binder.set_handler("notarizations", boost::bind(&simple_wallet::show_notarizations, this, _1), "payments <payment_id_1> [<payment_id_2> ... <payment_id_N>] - Show payments <payment_id_1>, ... <payment_id_N>");
+  // notarization code
+//  m_cmd_binder.set_handler("notarize", boost::bind(&simple_wallet::notarize, this, _1), "notarize");
+  // notarization code
+  m_cmd_binder.set_handler("notarizations", boost::bind(&simple_wallet::show_notarizations, this, _1), "notarizations <payment_id_1> [<payment_id_2> ... <payment_id_N>] - Show notarizations <payment_id_1>, ... <payment_id_N>");
 
 }
 //----------------------------------------------------------------------------------------------------
@@ -851,7 +849,7 @@ bool simple_wallet::show_payments(const std::vector<std::string> &args)
 
   return true;
 }
-
+// notarization code
 //----------------------------------------------------------------------------------------------------
 bool simple_wallet::show_notarizations(const std::vector<std::string> &args)
 {
@@ -863,7 +861,7 @@ bool simple_wallet::show_notarizations(const std::vector<std::string> &args)
 
   message_writer() << "                            payment                             \t" <<
     "                          transaction                           \t" <<
-    "  height\t       amount        \tunlock time           \tsent time";
+    "  height\t       amount        \tunlock time           \ttimestamp";
 
   bool payments_found = false;
   for(std::string arg : args)
@@ -885,12 +883,6 @@ bool simple_wallet::show_notarizations(const std::vector<std::string> &args)
         {
           payments_found = true;
         }
-
-//        time_t rawtime;
-//        rawtime = pd.m_sent_time;
-//        struct tm * timeinfo;
-//        timeinfo = localtime ( &rawtime );
-        crypto::hash::get_transaction_hash(pd.m_tx_hash);
 
         success_msg_writer(true) <<
           payment_id << '\t' <<
@@ -1108,7 +1100,8 @@ bool simple_wallet::transfer(const std::vector<std::string> &args_)
 
   return true;
 }
-
+// notarization code
+//----------------------------------------------------------------------------------------------------
 bool simple_wallet::notarize(const std::vector<std::string> &args_)
 {
   if (!try_connect_to_daemon())

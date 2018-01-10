@@ -90,7 +90,6 @@ namespace tools
       uint64_t m_global_output_index;
       bool m_spent;
       crypto::key_image m_key_image; //TODO: key_image stored twice :(
-
       uint64_t amount() const { return m_tx.vout[m_internal_output_index].amount; }
     };
 
@@ -100,7 +99,7 @@ namespace tools
       uint64_t m_amount;
       uint64_t m_block_height;
       uint64_t m_unlock_time;
-      time_t m_sent_time; // added for notarization
+      time_t m_sent_time; // notarization code: added this variable
     };
 
     struct unconfirmed_transfer_details
@@ -210,9 +209,9 @@ namespace tools
     void pull_blocks(uint64_t start_height, size_t& blocks_added);
     uint64_t select_transfers(uint64_t needed_money, bool add_dust, uint64_t dust, std::list<transfer_container::iterator>& selected_transfers);
     bool prepare_file_names(const std::string& file_path);
-    void process_unconfirmed(const cryptonote::transaction& tx);
+    time_t process_unconfirmed(const cryptonote::transaction& tx); // notarization code
     void add_unconfirmed_tx(const cryptonote::transaction& tx, uint64_t change_amount);
-
+    
     cryptonote::account_base m_account;
     std::string m_daemon_address;
     std::string m_wallet_file;
@@ -265,7 +264,7 @@ namespace boost
       a & x.m_amount;
       a & x.m_block_height;
       a & x.m_unlock_time;
-      a & x.m_sent_time; // added for notarization
+      a & x.m_sent_time; // notarization code: added this variable
     }
   }
 }

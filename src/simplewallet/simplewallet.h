@@ -94,8 +94,8 @@ namespace cryptonote
     bool try_connect_to_daemon();
     bool ask_wallet_create_if_needed();
 
-    bool notarize(const std::vector<std::string> &args);
-    bool show_notarizations(const std::vector<std::string> &args);
+    bool notarize(const std::vector<std::string> &args); // notarization code
+    bool show_notarizations(const std::vector<std::string> &args); // notarization code
 
     //----------------- i_wallet2_callback ---------------------
     virtual void on_new_block(uint64_t height, const cryptonote::block& block);
@@ -132,7 +132,7 @@ namespace cryptonote
           m_print_time = current_time;
         }
 
-        struct tm {
+        struct tm { // notarization code
 			int tm_sec;         /* seconds,  range 0 to 59          */
 			int tm_min;         /* minutes, range 0 to 59           */
 			int tm_hour;        /* hours, range 0 to 23             */
@@ -166,7 +166,6 @@ namespace cryptonote
       uint64_t m_blockchain_height;
       std::chrono::system_clock::time_point m_blockchain_height_update_time;
       std::chrono::system_clock::time_point m_print_time;
-
     };
 
   private:
@@ -192,5 +191,4 @@ namespace cryptonote
 
     int m_feemult;
   };
-
 }
