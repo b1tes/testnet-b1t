@@ -308,17 +308,17 @@ namespace cryptonote
     extra_nonce.clear();
     extra_nonce.push_back(TX_EXTRA_NONCE_PAYMENT_ID);
 
-    std::cout << "cryptonote_format_utils::extra_nonce.size() 1: " << extra_nonce.size() << "\n\n"; // notarization code
-    std::cout << "cryptonote_format_utils::extra_nonce 1: " << extra_nonce << "\n\n"; // notarization code
+//    std::cout << "cryptonote_format_utils::extra_nonce.size() 1: " << extra_nonce.size() << "\n\n"; // notarization code
+//    std::cout << "cryptonote_format_utils::extra_nonce 1: " << extra_nonce << "\n\n"; // notarization code
 
     const uint8_t* payment_id_ptr = reinterpret_cast<const uint8_t*>(&payment_id);
 
-    std::cout << "cryptonote_format_utils::payment_id_ptr: " << payment_id_ptr << "\n\n";  // notarization code
+//    std::cout << "cryptonote_format_utils::payment_id_ptr: " << payment_id_ptr << "\n\n";  // notarization code
 
     std::copy(payment_id_ptr, payment_id_ptr + sizeof(payment_id), std::back_inserter(extra_nonce));
 
-    std::cout << "cryptonote_format_utils::extra_nonce.size() 2: " << extra_nonce.size() << "\n\n";  // notarization code
-    std::cout << "cryptonote_format_utils::extra_nonce 2: " << extra_nonce << "\n\n";  // notarization code
+//    std::cout << "cryptonote_format_utils::extra_nonce.size() 2: " << extra_nonce.size() << "\n\n";  // notarization code
+//    std::cout << "cryptonote_format_utils::extra_nonce 2: " << extra_nonce << "\n\n";  // notarization code
   }
   //---------------------------------------------------------------
   bool get_payment_id_from_tx_extra_nonce(const blobdata& extra_nonce, crypto::hash& payment_id)

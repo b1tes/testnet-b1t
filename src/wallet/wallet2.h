@@ -211,7 +211,7 @@ namespace tools
     bool prepare_file_names(const std::string& file_path);
     time_t process_unconfirmed(const cryptonote::transaction& tx); // notarization code
     void add_unconfirmed_tx(const cryptonote::transaction& tx, uint64_t change_amount);
-    
+
     cryptonote::account_base m_account;
     std::string m_daemon_address;
     std::string m_wallet_file;

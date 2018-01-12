@@ -884,13 +884,16 @@ bool simple_wallet::show_notarizations(const std::vector<std::string> &args)
           payments_found = true;
         }
 
+        struct tm * timeinfo;
+        timeinfo = localtime (&pd.m_sent_time);
+
         success_msg_writer(true) <<
           payment_id << '\t' <<
           pd.m_tx_hash << '\t' <<
           std::setw(8)  << pd.m_block_height << '\t' <<
           std::setw(21) << print_money(pd.m_amount) << '\t' <<
 		  std::setw(21) << pd.m_unlock_time << '\t' <<
-		  pd.m_sent_time;
+		  asctime(timeinfo);
       }
     }
     else
